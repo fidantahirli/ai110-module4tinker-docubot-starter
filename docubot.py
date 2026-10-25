@@ -9,8 +9,8 @@ Core DocuBot class responsible for:
 
 import os
 import glob
-STOPWORDS = ["the", "is", "where", "a", "an", "of", "to", "how", "do", "i", "what", "which", "in", "does", "are"]
-
+STOPWORDS = ["the", "is", "where", "a", "an", "of", "to", "how", "do", "i", "what", "which", "in", "does", "are", "there", "any", "these", "docs", "for", "and", "this", "that", "it", "be", "can", "if", "my", "our"]
+MIN_SCORE = 1
 class DocuBot:
     def __init__(self, docs_folder="docs", llm_client=None):
         """
@@ -22,6 +22,7 @@ class DocuBot:
 
         # Load documents into memory
         self.documents = self.load_documents()  # List of (filename, text)
+        self.chunks = self.build_chunks(self.documents)
 
         # Build a retrieval index (implemented in Phase 1)
         self.index = self.build_index(self.documents)
@@ -67,26 +68,31 @@ class DocuBot:
     # -----------------------------------------------------------
     # Scoring and Retrieval (Phase 1)
     # -----------------------------------------------------------
-
+    def build_chunks(self, documents):
+        chunks = []
+        for filename, text in documents:
+            for piece in text.split("\n#"):
+                if piece.strip():
+                    chunks.append((filename, piece.strip()))
+        return chunks
     def score_document(self, query, text):
         score = 0
         for word in query.lower().split():
             word = word.strip("?.,!")
             if word in STOPWORDS:
                 continue
-            if word in text.lower():
+            if word[:6] in text.lower():
                 score += 1
         return score
 
     def retrieve(self, query, top_k=3):
         results = []
-        for filename, text in self.documents:
+        for filename, text in self.chunks:
             score = self.score_document(query, text)
-            print(filename, score)
-            if score > 0:
+            if score >= MIN_SCORE:
                 results.append((filename, text, score))
 
-        results.sort(key=lambda item: item[2], reverse=True)
+        results.sort(key=lambda item: (-item[2], len(item[1])))
 
         top = []
         for filename, text, score in results[:top_k]:
